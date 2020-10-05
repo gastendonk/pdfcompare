@@ -1,5 +1,9 @@
 package de.redsix.pdfcompare;
 
+import java.util.Collection;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
 /**
  * Describes a rectangular area of a page or multiple pages.
  * Is is used to specify exclusions and areas, that differ.
@@ -72,6 +76,14 @@ public class PageArea {
         }
     }
 
+    public boolean hasPage() {
+        return page >= 1;
+    }
+
+    public boolean hasCoordinates() {
+        return x1 >= 0;
+    }
+
     public boolean contains(int x, int y) {
         if (x1 == -1 && y1 == -1 && x2 == -1 && y2 == -1) {
             return true;
@@ -98,8 +110,60 @@ public class PageArea {
     public int getY2() {
         return y2;
     }
+    
+    @Override
+    public int hashCode() {
+        return page + 31 * x1;
+    }
+    
+    @Override
+    public boolean equals(Object obj) {
+        if (obj == this) {
+            return true;
+        }
+        
+        if (obj == null || ! (obj instanceof PageArea)) {
+            return false;
+        }
+        
+        PageArea pageArea = (PageArea) obj;
+        
+        return this.getPage() == pageArea.getPage()
+                && this.getX1() == pageArea.getX1()
+                && this.getY1() == pageArea.getY1()
+                && this.getX2() == pageArea.getX2()
+                && this.getY2() == pageArea.getY2()
+            ;
+    }
 
     public String asJson() {
-        return "{\"page\":" + page + ",\"x1\":" + x1 + ",\"y1\":" + y1 + ",\"x2\":" + x2 + ",\"y2\":" + y2 + "}";
+        if (hasPage()) {
+            if (hasCoordinates()) {
+                return "{\"page\": " + page + ", \"x1\": " + x1 + ", \"y1\": " + y1 + ", \"x2\": " + x2 + ", \"y2\": " + y2 + "}";
+            } else {
+                return "{\"page\": " + page + "}";
+            }
+        } else {
+            return "{\"x1\": " + x1 + ", \"y1\": " + y1 + ", \"x2\": " + x2 + ", \"y2\": " + y2 + "}";
+        }
+    }
+
+    public static String asJsonWithExclusion(Collection<PageArea> pageAreas) {
+        return asJsonWithExclusion(pageAreas.stream());
+    }
+
+    public static String asJsonWithExclusion(Stream<PageArea> pageAreaStream) {
+        String json = asJson(pageAreaStream);
+        return json.isEmpty()
+                ? "exclusions: [\n]"
+                : "exclusions: [\n" + json + "\n]";
+    }
+
+    public static String asJson(Collection<PageArea> pageAreas) {
+        return asJson(pageAreas.stream());
+    }
+
+    public static String asJson(Stream<PageArea> pageAreas) {
+        return pageAreas.map(PageArea::asJson).collect(Collectors.joining(",\n"));
     }
 }
