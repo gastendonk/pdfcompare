@@ -1,18 +1,26 @@
 package de.redsix.pdfcompare.ui;
 
-import de.redsix.pdfcompare.CompareResultWithExpectedAndActual;
-import de.redsix.pdfcompare.Exclusions;
-import de.redsix.pdfcompare.PageArea;
-import de.redsix.pdfcompare.PdfComparator;
-import de.redsix.pdfcompare.cli.CliArguments;
-import de.redsix.pdfcompare.env.DefaultEnvironment;
-import de.redsix.pdfcompare.env.Environment;
-import org.apache.pdfbox.pdmodel.PDDocument;
-import org.apache.pdfbox.pdmodel.encryption.InvalidPasswordException;
-
-import javax.swing.*;
-import java.awt.*;
-import java.awt.event.*;
+import java.awt.BasicStroke;
+import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.Cursor;
+import java.awt.Dimension;
+import java.awt.FlowLayout;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.GraphicsEnvironment;
+import java.awt.Image;
+import java.awt.KeyboardFocusManager;
+import java.awt.Point;
+import java.awt.Rectangle;
+import java.awt.Toolkit;
+import java.awt.event.ActionListener;
+import java.awt.event.ComponentAdapter;
+import java.awt.event.ComponentEvent;
+import java.awt.event.KeyEvent;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.awt.event.MouseWheelListener;
 import java.awt.geom.Point2D;
 import java.awt.image.BufferedImage;
 import java.io.File;
@@ -22,6 +30,34 @@ import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+
+import javax.swing.BoundedRangeModel;
+import javax.swing.ButtonGroup;
+import javax.swing.JButton;
+import javax.swing.JFileChooser;
+import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JOptionPane;
+import javax.swing.JPanel;
+import javax.swing.JPasswordField;
+import javax.swing.JScrollPane;
+import javax.swing.JSplitPane;
+import javax.swing.JTextArea;
+import javax.swing.JToggleButton;
+import javax.swing.JToolBar;
+import javax.swing.SwingUtilities;
+import javax.swing.WindowConstants;
+
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.pdmodel.encryption.InvalidPasswordException;
+
+import de.redsix.pdfcompare.CompareResultWithExpectedAndActual;
+import de.redsix.pdfcompare.Exclusions;
+import de.redsix.pdfcompare.PageArea;
+import de.redsix.pdfcompare.PdfComparator;
+import de.redsix.pdfcompare.cli.CliArguments;
+import de.redsix.pdfcompare.env.DefaultEnvironment;
+import de.redsix.pdfcompare.env.Environment;
 
 public class Display {
 
@@ -273,7 +309,12 @@ public class Display {
         };
 
         // zoom using the mouse wheel
+        MutableObject<Boolean> controlState = new MutableObject(Boolean.FALSE);
         final MouseWheelListener mouseWheelListener = mouseWheelEvent -> {
+            if (! controlState.getValue().booleanValue()) {
+                return;
+            }
+            
             BoundedRangeModel horizontalModel = actualScrollPane.getHorizontalScrollBar().getModel();
             BoundedRangeModel verticalModel = actualScrollPane.getVerticalScrollBar().getModel();
             double horizontalOffset = horizontalModel.getValue();
@@ -285,7 +326,6 @@ public class Display {
             if (mouseWheelEvent.getWheelRotation() > 0) {
                 leftPanel.decreaseZoom();
                 resultPanel.decreaseZoom();
-
                 // keep visible area centered on zooming out
                 double zoomAfter = leftPanel.getZoomFactor();
                 int horizontalValue = (int) ((horizontalOffset + horizontalExtent / 2) * zoomAfter / zoomBefore - horizontalExtent / 2);
@@ -314,11 +354,17 @@ public class Display {
         KeyboardFocusManager.getCurrentKeyboardFocusManager().addKeyEventDispatcher(keyEvent -> {
             if (keyEvent.getKeyCode() == KeyEvent.VK_CONTROL) {
                 if (keyEvent.getID() == KeyEvent.KEY_PRESSED) {
-                    leftPanel.addMouseWheelListener(mouseWheelListener);
-                    resultPanel.addMouseWheelListener(mouseWheelListener);
+                    if (! controlState.getValue().booleanValue()) {
+                        controlState.setValue(Boolean.TRUE);
+                        leftPanel.addMouseWheelListener(mouseWheelListener);
+                        resultPanel.addMouseWheelListener(mouseWheelListener);
+                    }
                 } else if (keyEvent.getID() == KeyEvent.KEY_RELEASED) {
-                    leftPanel.removeMouseWheelListener(mouseWheelListener);
-                    resultPanel.removeMouseWheelListener(mouseWheelListener);
+                    if (controlState.getValue().booleanValue()) {
+                        controlState.setValue(Boolean.FALSE);
+                        leftPanel.removeMouseWheelListener(mouseWheelListener);
+                        resultPanel.removeMouseWheelListener(mouseWheelListener);
+                    }
                 }
             }
             return false;
@@ -550,5 +596,25 @@ public class Display {
 
     public Exclusions getExclusions() {
         return exclusions;
+    }
+    
+    static public class MutableObject<T> {
+        private T value;
+        
+        public MutableObject() {
+            
+        }
+        
+        public MutableObject(T value) {
+            setValue(value);
+        }
+        
+        public T getValue() {
+            return value;
+        }
+        
+        public void setValue(T value) {
+            this.value = value;
+        }
     }
 }
