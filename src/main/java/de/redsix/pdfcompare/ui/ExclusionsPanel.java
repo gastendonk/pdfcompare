@@ -66,7 +66,7 @@ public class ExclusionsPanel extends JPanel {
 
     private void init() {
         this.setLayout(new BorderLayout());
-        this.setPreferredSize(new Dimension(220, 100));
+        this.setPreferredSize(new Dimension(240, 100));
 
         this.add(new JLabel("Excluded Areas"), BorderLayout.NORTH);
 
