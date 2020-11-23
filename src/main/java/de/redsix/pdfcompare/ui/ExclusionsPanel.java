@@ -1,14 +1,17 @@
 package de.redsix.pdfcompare.ui;
 
-import de.redsix.pdfcompare.Exclusions;
-import de.redsix.pdfcompare.PageArea;
-import de.redsix.pdfcompare.env.Environment;
-
-import javax.swing.*;
-import javax.swing.border.BevelBorder;
-import java.awt.*;
+import java.awt.BorderLayout;
+import java.awt.Component;
+import java.awt.Container;
+import java.awt.Cursor;
+import java.awt.Dimension;
+import java.awt.Font;
 import java.awt.datatransfer.DataFlavor;
-import java.awt.dnd.*;
+import java.awt.dnd.DnDConstants;
+import java.awt.dnd.DropTarget;
+import java.awt.dnd.DropTargetAdapter;
+import java.awt.dnd.DropTargetDragEvent;
+import java.awt.dnd.DropTargetDropEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
@@ -20,8 +23,29 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
+import javax.swing.BorderFactory;
+import javax.swing.BoxLayout;
+import javax.swing.JButton;
+import javax.swing.JFileChooser;
+import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JOptionPane;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.JToolBar;
+import javax.swing.border.BevelBorder;
+import javax.swing.filechooser.FileFilter;
+import javax.swing.filechooser.FileNameExtensionFilter;
+
+import de.redsix.pdfcompare.Exclusions;
+import de.redsix.pdfcompare.PageArea;
+import de.redsix.pdfcompare.env.Environment;
+
 
 public class ExclusionsPanel extends JPanel {
+
+    static private FileFilter CONFIG_FILTER = new FileNameExtensionFilter("*.conf, *.json", "conf", "json");
+    static private final Font LABEL_FONT = Font.decode("SansSerif-plain-10");
 
     private final Environment environment;
     private JPanel exclusionsList;
@@ -52,7 +76,7 @@ public class ExclusionsPanel extends JPanel {
         JPanel configPanel = new JPanel(null);
         configPanel.setPreferredSize(new Dimension(200, 40));
         JLabel configLabel = new JLabel("Config File:");
-        configLabel.setFont(Font.decode("SansSerif-plain-10"));
+        configLabel.setFont(LABEL_FONT);
         configLabel.setBounds(5, 0, 190, 15);
         configPanel.add(configLabel);
 
@@ -158,6 +182,7 @@ public class ExclusionsPanel extends JPanel {
     private void loadAction() {
         JFileChooser fileChooser = new JFileChooser();
         fileChooser.setSelectedFile(selectedFile);
+        fileChooser.setFileFilter(CONFIG_FILTER);
 
         if (fileChooser.showDialog(this, "Open exclusions definition") == JFileChooser.APPROVE_OPTION) {
             openExclusionFile(fileChooser.getSelectedFile());
@@ -167,6 +192,8 @@ public class ExclusionsPanel extends JPanel {
     private void saveAction() {
         JFileChooser fileChooser = new JFileChooser();
         fileChooser.setSelectedFile(selectedFile);
+        fileChooser.setFileFilter(CONFIG_FILTER);
+
         if (fileChooser.showDialog(this, "Save exclusions as") == JFileChooser.APPROVE_OPTION) {
             try {
                 selectedFile = fileChooser.getSelectedFile();
@@ -309,6 +336,7 @@ public class ExclusionsPanel extends JPanel {
             });
             exclusionsList.add(item);
         });
+        
         exclusionsList.revalidate();
     }
 
@@ -343,10 +371,9 @@ public class ExclusionsPanel extends JPanel {
     void openExclusionFile(File exclusionFile) {
         this.setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
         try {
-            selectedFile = exclusionFile;
-            Exclusions exclusions = new Exclusions(environment);
-
             setSelectedFile(exclusionFile);
+
+            Exclusions exclusions = new Exclusions(environment);
 
             if (exclusionFile != null) {
                 exclusions.readExclusions(exclusionFile);
