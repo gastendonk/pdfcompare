@@ -34,6 +34,7 @@ import java.util.Optional;
 import javax.swing.BoundedRangeModel;
 import javax.swing.ButtonGroup;
 import javax.swing.JButton;
+import javax.swing.JComponent;
 import javax.swing.JFileChooser;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
@@ -43,6 +44,7 @@ import javax.swing.JPasswordField;
 import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
 import javax.swing.JTextArea;
+import javax.swing.JTextField;
 import javax.swing.JToggleButton;
 import javax.swing.JToolBar;
 import javax.swing.SwingUtilities;
@@ -66,6 +68,8 @@ public class Display {
     private final ImagePanel leftPanel = new ImagePanel(viewModel.getLeftImage());
     private final ImagePanel resultPanel = new ImagePanel(viewModel.getDiffImage());
     private final JToggleButton expectedButton = new JToggleButton("Expected");
+    private final JTextField pageIndexField = new JTextField(3);
+    private final JTextField pageCountField = new JTextField(3);
     private ExclusionsPanel exclusionsPanel;
     private boolean showExclusions = false;
     private PageArea dragArea;
@@ -165,8 +169,23 @@ public class Display {
 
         toolBar.addSeparator();
 
+        pageIndexField.setEditable(false);
+        pageIndexField.setFocusable(false);
+        pageIndexField.setHorizontalAlignment(JTextField.RIGHT);
+        pageIndexField.setMaximumSize(new Dimension(40, pageIndexField.getPreferredSize().height));
+        toolBar.add(pageIndexField);
+
+        toolBar.add(new JLabel("/"));
+
+        pageCountField.setEditable(false);
+        pageCountField.setFocusable(false);
+        pageCountField.setMaximumSize(new Dimension(40, pageCountField.getPreferredSize().height));
+        pageCountField.setHorizontalAlignment(JTextField.LEFT);
+        toolBar.add(pageCountField);
+
         addToolBarButton(toolBar, "Page -", event -> {
             if (viewModel.decreasePage()) {
+                pageIndexField.setText("" + (viewModel.getPageToShow() + 1));
                 leftPanel.setImage(applyExclusions(viewModel.getLeftImage()));
                 resultPanel.setImage(applyExclusions(viewModel.getDiffImage()));
             }
@@ -174,6 +193,7 @@ public class Display {
 
         addToolBarButton(toolBar, "Page +", event -> {
             if (viewModel.increasePage()) {
+                pageIndexField.setText("" + (viewModel.getPageToShow() + 1));
                 leftPanel.setImage(applyExclusions(viewModel.getLeftImage()));
                 resultPanel.setImage(applyExclusions(viewModel.getDiffImage()));
             }
@@ -411,9 +431,11 @@ public class Display {
             final CompareResultWithExpectedAndActual compareResult = pdfComparator.compare();
 
             viewModel = new ViewModel(compareResult);
-//            exclusionsPanel.useDifferencesFromCompare(compareResult.getDifferences());
             leftPanel.setImage(applyExclusions(viewModel.getLeftImage()));
             resultPanel.setImage(applyExclusions(viewModel.getDiffImage()));
+
+            pageIndexField.setText("" + (viewModel.getPageToShow() + 1));
+            pageCountField.setText("" + compareResult.getNumberOfPages());
 
             if (compareResult.isEqual()) {
                 JOptionPane.showMessageDialog(frame, "The compared documents are identical.");
