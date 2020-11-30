@@ -24,17 +24,20 @@ import java.awt.event.MouseWheelListener;
 import java.awt.geom.Point2D;
 import java.awt.image.BufferedImage;
 import java.io.File;
+import java.io.FileReader;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.io.Reader;
 import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import javax.swing.BoundedRangeModel;
 import javax.swing.ButtonGroup;
 import javax.swing.JButton;
-import javax.swing.JComponent;
 import javax.swing.JFileChooser;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
@@ -53,6 +56,12 @@ import javax.swing.WindowConstants;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.encryption.InvalidPasswordException;
 
+import com.typesafe.config.Config;
+import com.typesafe.config.ConfigFactory;
+import com.typesafe.config.ConfigObject;
+import com.typesafe.config.ConfigParseOptions;
+import com.typesafe.config.ConfigSyntax;
+
 import de.redsix.pdfcompare.CompareResultWithExpectedAndActual;
 import de.redsix.pdfcompare.Exclusions;
 import de.redsix.pdfcompare.PageArea;
@@ -61,7 +70,12 @@ import de.redsix.pdfcompare.cli.CliArguments;
 import de.redsix.pdfcompare.env.DefaultEnvironment;
 import de.redsix.pdfcompare.env.Environment;
 
+
 public class Display {
+
+    static private final Color SHADE_BORDER = new Color(0x708090);
+    static private final Color SHADE = new Color(0x70606000, true);
+    static private final Color SHADE_HIGHLIGHT = new Color(0xA0A0A0FF, true);
 
     private final JFrame frame = new JFrame();
     private ViewModel viewModel = new ViewModel(new CompareResultWithExpectedAndActual());
@@ -75,14 +89,17 @@ public class Display {
     private PageArea dragArea;
     private final Environment environment = DefaultEnvironment.create();
     private final Exclusions exclusions = new Exclusions(environment);
+    private PdfCompareStudioConfig config;
+
 
     public void init(CliArguments cliArguments) {
+        this.config = loadConfig();
         init();
+
         if (cliArguments.hasFileArguments()) {
             try {
                 cliArguments.getExclusionsFile().ifPresent(ef -> {
                     exclusions.readExclusions(ef);
-//                    exclusionsPanel.setSelectedFile(new File(ef));
                     exclusionsPanel.openExclusionFile(new File(ef));
                 });
                 openFiles(new File(cliArguments.getExpectedFile().get()), cliArguments.getExpectedPassword(),
@@ -91,6 +108,38 @@ public class Display {
                 displayExceptionDialog(frame, ex);
             }
         }
+    }
+
+    private PdfCompareStudioConfig loadConfig() {
+        String currentUsersHomeDir = System.getProperty("user.home");
+        File file;
+        file = new File(currentUsersHomeDir, "pdfcompare.conf");
+        if (! file.isFile()) {
+            file = new File("pdfcompare.conf");
+        }
+        if (! file.isFile()) {
+            return null;
+        }
+
+        PdfCompareStudioConfig config = new PdfCompareStudioConfig();
+
+        ConfigParseOptions configParseOptions = ConfigParseOptions.defaults().setSyntax(ConfigSyntax.CONF).setAllowMissing(true);
+        try (Reader reader = new FileReader(file)) {
+            Config exclusionConfig = ConfigFactory.parseReader(reader, configParseOptions);
+            config.directory = exclusionConfig.getString("directory");
+
+            ConfigObject groupObject = exclusionConfig.getObject("group");
+            if (groupObject != null) {
+                config.expectedFilePattern = Pattern.compile(groupObject.toConfig().getString("expectedFilePattern"));
+                config.actualFilePattern = Pattern.compile(groupObject.toConfig().getString("actualFilePattern"));
+                config.exclusionFilePattern = Pattern.compile(groupObject.toConfig().getString("exclusionFilePattern"));
+            }
+            
+        } catch (IOException e) {
+            // ignored
+        }
+
+        return config;
     }
 
     public void init() {
@@ -148,24 +197,7 @@ public class Display {
         exclusionsPanel.setVisible(showExclusions);
         frame.add(exclusionsPanel, BorderLayout.EAST);
 
-        addToolBarButton(toolBar, "Open...", event -> {
-            JFileChooser fileChooser = new JFileChooser();
-            try {
-                if (fileChooser.showDialog(frame, "Open expected PDF") == JFileChooser.APPROVE_OPTION) {
-                    final File expectedFile = fileChooser.getSelectedFile();
-                    final Optional<String> passwordForExpectedFile = askForPasswordIfNeeded(expectedFile);
-
-                    if (fileChooser.showDialog(frame, "Open actual PDF") == JFileChooser.APPROVE_OPTION) {
-                        final File actualFile = fileChooser.getSelectedFile();
-                        final Optional<String> passwordForActualFile = askForPasswordIfNeeded(actualFile);
-
-                        openFiles(expectedFile, passwordForExpectedFile, actualFile, passwordForActualFile, Optional.empty());
-                    }
-                }
-            } catch (IOException ex) {
-                displayExceptionDialog(frame, ex);
-            }
-        });
+        addToolBarButton(toolBar, "Open...", event -> onOpenAction());
 
         toolBar.addSeparator();
 
@@ -259,6 +291,162 @@ public class Display {
 
         toolBar.addSeparator();
 
+        addMouseWheelZoomSupport(actualScrollPane);
+
+        final JToggleButton exclusionMode = new JToggleButton("Exclusions");
+        exclusionMode.setFocusable(false);
+        exclusionMode.addActionListener(event -> onExclusionsAction(exclusionMode.isSelected()));
+        toolBar.add(exclusionMode);
+
+        frame.setVisible(true);
+    }
+    
+    private void addMouseWheelZoomSupport(JScrollPane actualScrollPane) {
+        // zoom using the mouse wheel
+        MutableObject<Boolean> controlState = new MutableObject(Boolean.FALSE);
+
+        final MouseWheelListener mouseWheelListener = mouseWheelEvent -> {
+            if (! controlState.getValue().booleanValue()) {
+                return;
+            }
+
+            BoundedRangeModel horizontalModel = actualScrollPane.getHorizontalScrollBar().getModel();
+            BoundedRangeModel verticalModel = actualScrollPane.getVerticalScrollBar().getModel();
+            double horizontalOffset = horizontalModel.getValue();
+            double verticalOffset = verticalModel.getValue();
+            double horizontalExtent = horizontalModel.getExtent();
+            double verticalExtent = verticalModel.getExtent();
+            double zoomBefore = leftPanel.getZoomFactor();
+
+            if (mouseWheelEvent.getWheelRotation() > 0) {
+                leftPanel.decreaseZoom();
+                resultPanel.decreaseZoom();
+                // keep visible area centered on zooming out
+                double zoomAfter = leftPanel.getZoomFactor();
+                int horizontalValue = (int) ((horizontalOffset + horizontalExtent / 2) * zoomAfter / zoomBefore - horizontalExtent / 2);
+                int verticalValue = (int) ((verticalOffset + verticalExtent / 2) * zoomAfter / zoomBefore - verticalExtent / 2);
+                horizontalModel.setValue(horizontalValue);
+                verticalModel.setValue(verticalValue);
+
+            } else {
+                leftPanel.increaseZoom();
+                resultPanel.increaseZoom();
+
+                // keep visible area centered on mouse cursor
+                Point mousePoint = mouseWheelEvent.getPoint();
+                double zoomAfter = leftPanel.getZoomFactor();
+                int horizontalValue = (int) (mousePoint.x * zoomAfter / zoomBefore - horizontalExtent / 2);
+                int verticalValue = (int) (mousePoint.y * zoomAfter / zoomBefore - verticalExtent / 2);
+
+                // FIXME: this is a workaround because the zoom isn't applied to the scrollbars immediately and scroll maximum might be too small at this time.
+                SwingUtilities.invokeLater(() -> {
+                    horizontalModel.setValue(horizontalValue);
+                    verticalModel.setValue(verticalValue);
+                });
+            }
+        };
+
+        KeyboardFocusManager.getCurrentKeyboardFocusManager().addKeyEventDispatcher(keyEvent -> {
+            if (keyEvent.getKeyCode() == KeyEvent.VK_CONTROL) {
+                if (keyEvent.getID() == KeyEvent.KEY_PRESSED) {
+                    if (! controlState.getValue().booleanValue()) {
+                        controlState.setValue(Boolean.TRUE);
+                        leftPanel.addMouseWheelListener(mouseWheelListener);
+                        resultPanel.addMouseWheelListener(mouseWheelListener);
+                    }
+                } else if (keyEvent.getID() == KeyEvent.KEY_RELEASED) {
+                    if (controlState.getValue().booleanValue()) {
+                        controlState.setValue(Boolean.FALSE);
+                        leftPanel.removeMouseWheelListener(mouseWheelListener);
+                        resultPanel.removeMouseWheelListener(mouseWheelListener);
+                    }
+                }
+            }
+            return false;
+        });
+
+    }
+
+    private void onOpenAction() {
+        JFileChooser fileChooser = new JFileChooser();
+        if (config != null && config.directory != null) {
+            fileChooser.setCurrentDirectory(new File(config.directory));
+        }
+
+        try {
+            if (fileChooser.showDialog(frame, "Open expected PDF") == JFileChooser.APPROVE_OPTION) {
+                final File expectedFile = fileChooser.getSelectedFile();
+                File exclusionFile = null;
+
+                if (config != null && config.expectedFilePattern != null) {
+                    Matcher matcher = config.expectedFilePattern.matcher(expectedFile.getName());
+                    if (matcher.matches()) {
+                        if (config.actualFilePattern != null) {
+                            String actualFilename = expectedFile.getName().replaceFirst(config.expectedFilePattern.pattern(), config.actualFilePattern.pattern());
+                            File f = new File(expectedFile.getParentFile(), actualFilename);
+                            if (f.isFile()) {
+                                fileChooser.setSelectedFile(f);
+                            }
+                        }
+
+                        if (config.exclusionFilePattern != null) {
+                            String exclusionFilename = expectedFile.getName().replaceFirst(config.expectedFilePattern.pattern(), config.exclusionFilePattern.pattern());
+                            exclusionFile = new File(expectedFile.getParentFile(), exclusionFilename);
+                            if (! exclusionFile.isFile()) {
+                                exclusionFile = null;
+                            }
+                        }
+                    }
+                }
+
+                final Optional<String> passwordForExpectedFile = askForPasswordIfNeeded(expectedFile);
+
+                if (fileChooser.showDialog(frame, "Open actual PDF") == JFileChooser.APPROVE_OPTION) {
+                    final File actualFile = fileChooser.getSelectedFile();
+                    final Optional<String> passwordForActualFile = askForPasswordIfNeeded(actualFile);
+
+                    openFiles(expectedFile, passwordForExpectedFile, actualFile, passwordForActualFile, Optional.empty());
+
+                    if (exclusionFile != null) {
+                        exclusionsPanel.openExclusionFile(exclusionFile);
+                    }
+                }
+            }
+        } catch (IOException ex) {
+            displayExceptionDialog(frame, ex);
+        }
+    }
+
+    private void openFiles(File expectedFile, Optional<String> passwordForExpectedFile, File actualFile, Optional<String> passwordForActualFile,
+            Optional<String> exclusions)
+            throws IOException {
+        frame.setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
+        try {
+            PdfComparator<CompareResultWithExpectedAndActual> pdfComparator
+                    = new PdfComparator<>(expectedFile, actualFile, new CompareResultWithExpectedAndActual());
+            passwordForExpectedFile.ifPresent(pdfComparator::withExpectedPassword);
+            passwordForActualFile.ifPresent(pdfComparator::withActualPassword);
+            exclusions.ifPresent(pdfComparator::withIgnore);
+            final CompareResultWithExpectedAndActual compareResult = pdfComparator.compare();
+
+            viewModel = new ViewModel(compareResult);
+            leftPanel.setImage(applyExclusions(viewModel.getLeftImage()));
+            resultPanel.setImage(applyExclusions(viewModel.getDiffImage()));
+
+            pageIndexField.setText("" + (viewModel.getPageToShow() + 1));
+            pageCountField.setText("" + compareResult.getNumberOfPages());
+
+            if (compareResult.isEqual()) {
+                JOptionPane.showMessageDialog(frame, "The compared documents are identical.");
+            }
+
+            expectedButton.setSelected(true);
+        } finally {
+            frame.setCursor(Cursor.getPredefinedCursor(Cursor.DEFAULT_CURSOR));
+        }
+    }
+
+    private void onExclusionsAction(boolean exclusionModeSelected) {
         final MouseAdapter mouseListener = new MouseAdapter() {
             private boolean dragging = false;
             private Point startPoint;
@@ -328,123 +516,24 @@ public class Display {
             }
         };
 
-        // zoom using the mouse wheel
-        MutableObject<Boolean> controlState = new MutableObject(Boolean.FALSE);
-        final MouseWheelListener mouseWheelListener = mouseWheelEvent -> {
-            if (! controlState.getValue().booleanValue()) {
-                return;
-            }
-            
-            BoundedRangeModel horizontalModel = actualScrollPane.getHorizontalScrollBar().getModel();
-            BoundedRangeModel verticalModel = actualScrollPane.getVerticalScrollBar().getModel();
-            double horizontalOffset = horizontalModel.getValue();
-            double verticalOffset = verticalModel.getValue();
-            double horizontalExtent = horizontalModel.getExtent();
-            double verticalExtent = verticalModel.getExtent();
-            double zoomBefore = leftPanel.getZoomFactor();
-
-            if (mouseWheelEvent.getWheelRotation() > 0) {
-                leftPanel.decreaseZoom();
-                resultPanel.decreaseZoom();
-                // keep visible area centered on zooming out
-                double zoomAfter = leftPanel.getZoomFactor();
-                int horizontalValue = (int) ((horizontalOffset + horizontalExtent / 2) * zoomAfter / zoomBefore - horizontalExtent / 2);
-                int verticalValue = (int) ((verticalOffset + verticalExtent / 2) * zoomAfter / zoomBefore - verticalExtent / 2);
-                horizontalModel.setValue(horizontalValue);
-                verticalModel.setValue(verticalValue);
-
-            } else {
-                leftPanel.increaseZoom();
-                resultPanel.increaseZoom();
-
-                // keep visible area centered on mouse cursor
-                Point mousePoint = mouseWheelEvent.getPoint();
-                double zoomAfter = leftPanel.getZoomFactor();
-                int horizontalValue = (int) (mousePoint.x * zoomAfter / zoomBefore - horizontalExtent / 2);
-                int verticalValue = (int) (mousePoint.y * zoomAfter / zoomBefore - verticalExtent / 2);
-
-                // FIXME: this is a workaround because the zoom isn't applied to the scrollbars immediately and scroll maximum might be too small at this time.
-                SwingUtilities.invokeLater(() -> {
-                    horizontalModel.setValue(horizontalValue);
-                    verticalModel.setValue(verticalValue);
-                });
-            }
-        };
-
-        KeyboardFocusManager.getCurrentKeyboardFocusManager().addKeyEventDispatcher(keyEvent -> {
-            if (keyEvent.getKeyCode() == KeyEvent.VK_CONTROL) {
-                if (keyEvent.getID() == KeyEvent.KEY_PRESSED) {
-                    if (! controlState.getValue().booleanValue()) {
-                        controlState.setValue(Boolean.TRUE);
-                        leftPanel.addMouseWheelListener(mouseWheelListener);
-                        resultPanel.addMouseWheelListener(mouseWheelListener);
-                    }
-                } else if (keyEvent.getID() == KeyEvent.KEY_RELEASED) {
-                    if (controlState.getValue().booleanValue()) {
-                        controlState.setValue(Boolean.FALSE);
-                        leftPanel.removeMouseWheelListener(mouseWheelListener);
-                        resultPanel.removeMouseWheelListener(mouseWheelListener);
-                    }
-                }
-            }
-            return false;
-        });
-
-        final JToggleButton exclusionMode = new JToggleButton("Exclusions");
-        exclusionMode.setFocusable(false);
-        exclusionMode.addActionListener(event -> {
-            if (exclusionMode.isSelected()) {
-                leftPanel.addMouseListener(mouseListener);
-                leftPanel.addMouseMotionListener(mouseListener);
-                resultPanel.addMouseListener(mouseListener);
-                resultPanel.addMouseMotionListener(mouseListener);
-                // Cross mouse pointer shows active XY mode and makes positioning easier.
-                leftPanel.setCursor(Cursor.getPredefinedCursor(Cursor.CROSSHAIR_CURSOR));
-                showExclusions = true;
-            } else {
-                leftPanel.removeMouseListener(mouseListener);
-                leftPanel.removeMouseMotionListener(mouseListener);
-                resultPanel.removeMouseListener(mouseListener);
-                resultPanel.removeMouseMotionListener(mouseListener);
-                leftPanel.setCursor(Cursor.getPredefinedCursor(Cursor.DEFAULT_CURSOR));
-                showExclusions = false;
-            }
-            exclusionsPanel.setVisible(showExclusions);
-            redrawImages();
-            frame.setTitle(title);
-        });
-        toolBar.add(exclusionMode);
-
-        frame.setVisible(true);
-    }
-
-    private void openFiles(File expectedFile, Optional<String> passwordForExpectedFile, File actualFile, Optional<String> passwordForActualFile,
-            Optional<String> exclusions)
-            throws IOException {
-        frame.setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
-        try {
-            PdfComparator<CompareResultWithExpectedAndActual> pdfComparator
-                    = new PdfComparator<>(expectedFile, actualFile, new CompareResultWithExpectedAndActual());
-            passwordForExpectedFile.ifPresent(pdfComparator::withExpectedPassword);
-            passwordForActualFile.ifPresent(pdfComparator::withActualPassword);
-            exclusions.ifPresent(pdfComparator::withIgnore);
-            final CompareResultWithExpectedAndActual compareResult = pdfComparator.compare();
-
-            viewModel = new ViewModel(compareResult);
-            leftPanel.setImage(applyExclusions(viewModel.getLeftImage()));
-            resultPanel.setImage(applyExclusions(viewModel.getDiffImage()));
-
-            pageIndexField.setText("" + (viewModel.getPageToShow() + 1));
-            pageCountField.setText("" + compareResult.getNumberOfPages());
-
-            if (compareResult.isEqual()) {
-                JOptionPane.showMessageDialog(frame, "The compared documents are identical.");
-            }
-
-            expectedButton.setSelected(true);
-        } finally {
-            frame.setCursor(Cursor.getPredefinedCursor(Cursor.DEFAULT_CURSOR));
+        if (exclusionModeSelected) {
+            leftPanel.addMouseListener(mouseListener);
+            leftPanel.addMouseMotionListener(mouseListener);
+            resultPanel.addMouseListener(mouseListener);
+            resultPanel.addMouseMotionListener(mouseListener);
+            // Cross mouse pointer shows active XY mode and makes positioning easier.
+            leftPanel.setCursor(Cursor.getPredefinedCursor(Cursor.CROSSHAIR_CURSOR));
+            showExclusions = true;
+        } else {
+            leftPanel.removeMouseListener(mouseListener);
+            leftPanel.removeMouseMotionListener(mouseListener);
+            resultPanel.removeMouseListener(mouseListener);
+            resultPanel.removeMouseMotionListener(mouseListener);
+            leftPanel.setCursor(Cursor.getPredefinedCursor(Cursor.DEFAULT_CURSOR));
+            showExclusions = false;
         }
+        exclusionsPanel.setVisible(showExclusions);
+        redrawImages();
     }
 
     static void displayExceptionDialog(final JFrame frame, final IOException ex) {
@@ -535,10 +624,6 @@ public class Display {
             frame.repaint();
         }
     }
-
-    static private final Color SHADE_BORDER = new Color(0x708090);
-    static private final Color SHADE = new Color(0x70606000, true);
-    static private final Color SHADE_HIGHLIGHT = new Color(0xA0A0A0FF, true);
 
     /**
      * paints shaded areas over defined exclusions
@@ -639,4 +724,18 @@ public class Display {
             this.value = value;
         }
     }
+    
+    /** this configuration is for personalized settings like default directories. */
+    static public class PdfCompareStudioConfig {
+        /** default directory for PDFs */
+        private String directory;
+        
+        /** matching pattern for the expected file. Match groups may be used the other file patterns. */
+        private Pattern expectedFilePattern;
+        /** pattern for the actual file. Matching groups (like $1) from the expectedFilePattern may be used. */
+        private Pattern actualFilePattern;
+        /** pattern for the sxclusions file. Matching groups (like $1) from the expectedFilePattern may be used. */
+        private Pattern exclusionFilePattern;
+    }
+    
 }
