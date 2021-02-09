@@ -18,13 +18,14 @@ Just include it as a dependency. Please check for the most current version avail
 
 ### Simple Usage
 
-There is a simple interactive UI, when you start the Class de.redsix.pdfcompare.Main 
-without any additional arguments. Next to the UI you can provide an expected and actual 
-file as well as an optional result file by CLI.
+There is a simple interactive UI, when you start the jar file 
+without any additional arguments (which starts the class de.redsix.pdfcompare.Main).
+Next to the UI you can provide an expected and actual 
+file and additional parameter via a CLI. To get a help for the CLI use the -h or --help option-.
 ```
-usage: java -jar pdfcompare-x.x.x.jar [EXPECTED] [ACTUAL]
+usage: java -jar pdfcompare-x.x.x-full.jar [EXPECTED] [ACTUAL]
  -h,--help              Displays this text and exit
- -o,--output <output>   Provide an optional output file for the result
+ ...
 ```
 
 But the focus of PdfCompare is on embedded usage as a library.
@@ -130,6 +131,9 @@ PdfCompare uses Lightbend Config (previously called TypeSafe Config) to read its
 files. If you want to specify another configuration file, you can find out more about that here:
 https://github.com/lightbend/config#standard-behavior. In particular you can specify a
 replacement config file with the -Dconfig.file=path/to/file command line argument.  
+
+Alternatively you can specify parameters either through a system environment variables or as a
+Jvm parameter with -DvariableName=<value>  
 
 Another way to specify a different config location programmatically is to create a
 new ConfigFileEnvironment(...) and pass it to PdfCompare.withEnvironment(...).
