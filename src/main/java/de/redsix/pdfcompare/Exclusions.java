@@ -85,7 +85,15 @@ public class Exclusions {
     }
 
     public PageExclusions forPage(final int page) {
-        return exclusionsPerPage.getOrDefault(page, exclusionsForAllPages);
+        PageExclusions result = new PageExclusions();
+        result.getExclusions().addAll(exclusionsForAllPages.getExclusions());
+        
+        PageExclusions exclusionsForPage = exclusionsPerPage.get(page);
+        if (exclusionsForPage != null) {
+            result.getExclusions().addAll(exclusionsForPage.getExclusions());
+        }
+        
+        return result;
     }
 
     public void readExclusions(final String filename) {

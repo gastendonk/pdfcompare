@@ -44,7 +44,7 @@ public class ExclusionItemPanel extends JPanel {
 
     private void init() {
         this.setLayout(null);
-        this.setPreferredSize(new Dimension(200, 45));
+        this.setPreferredSize(new Dimension(220, 45));
 
         this.add(createLabel("page", 5, 2, 30, 20));
         page = createIntField(5, 20, 30, 20);
