@@ -41,7 +41,7 @@ public class ViewModel {
     }
 
     public boolean increasePage() {
-        if (pageToShow < maxPages) {
+        if (pageToShow < maxPages - 1) {
             ++pageToShow;
             return true;
         }
