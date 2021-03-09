@@ -17,6 +17,8 @@ import java.awt.Toolkit;
 import java.awt.event.ActionListener;
 import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
+import java.awt.event.FocusAdapter;
+import java.awt.event.FocusEvent;
 import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
@@ -55,6 +57,8 @@ import javax.swing.WindowConstants;
 
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.encryption.InvalidPasswordException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
@@ -72,6 +76,8 @@ import de.redsix.pdfcompare.env.Environment;
 
 
 public class Display {
+
+    static private final Logger LOG = LoggerFactory.getLogger(Display.class);
 
     static private final Color SHADE_BORDER = new Color(0x708090);
     static private final Color SHADE = new Color(0x70606000, true);
@@ -93,7 +99,6 @@ public class Display {
 
 
     public void init(CliArguments cliArguments) {
-        this.config = loadConfig();
         init();
 
         if (cliArguments.hasFileArguments()) {
@@ -110,39 +115,9 @@ public class Display {
         }
     }
 
-    private PdfCompareStudioConfig loadConfig() {
-        String currentUsersHomeDir = System.getProperty("user.home");
-        File file;
-        file = new File(currentUsersHomeDir, "pdfcompare.conf");
-        if (! file.isFile()) {
-            file = new File("pdfcompare.conf");
-        }
-        if (! file.isFile()) {
-            return null;
-        }
-
-        PdfCompareStudioConfig config = new PdfCompareStudioConfig();
-
-        ConfigParseOptions configParseOptions = ConfigParseOptions.defaults().setSyntax(ConfigSyntax.CONF).setAllowMissing(true);
-        try (Reader reader = new FileReader(file)) {
-            Config exclusionConfig = ConfigFactory.parseReader(reader, configParseOptions);
-            config.directory = exclusionConfig.getString("directory");
-
-            ConfigObject groupObject = exclusionConfig.getObject("group");
-            if (groupObject != null) {
-                config.expectedFilePattern = Pattern.compile(groupObject.toConfig().getString("expectedFilePattern"));
-                config.actualFilePattern = Pattern.compile(groupObject.toConfig().getString("actualFilePattern"));
-                config.exclusionFilePattern = Pattern.compile(groupObject.toConfig().getString("exclusionFilePattern"));
-            }
-            
-        } catch (IOException e) {
-            // ignored
-        }
-
-        return config;
-    }
-
     public void init() {
+        loadConfig();
+        
         final String title = "PDF Compare Studio";
         frame.setTitle(title);
         List<Image> icons = new ArrayList<>();
@@ -201,11 +176,18 @@ public class Display {
 
         toolBar.addSeparator();
 
-        pageIndexField.setEditable(false);
-        pageIndexField.setFocusable(false);
+        pageIndexField.setEditable(true);
+        pageIndexField.setFocusable(true);
         pageIndexField.setHorizontalAlignment(JTextField.RIGHT);
         pageIndexField.setMaximumSize(new Dimension(40, pageIndexField.getPreferredSize().height));
         toolBar.add(pageIndexField);
+        pageIndexField.addActionListener(event -> onPageIndexAction());
+        pageIndexField.addFocusListener(new FocusAdapter() {
+            @Override
+            public void focusLost(FocusEvent event) {
+                onPageIndexAction();
+            }
+        });
 
         toolBar.add(new JLabel("/"));
 
@@ -215,19 +197,27 @@ public class Display {
         pageCountField.setHorizontalAlignment(JTextField.LEFT);
         toolBar.add(pageCountField);
 
-        addToolBarButton(toolBar, "Page -", event -> {
-            if (viewModel.decreasePage()) {
-                pageIndexField.setText("" + (viewModel.getPageToShow() + 1));
-                leftPanel.setImage(applyExclusions(viewModel.getLeftImage()));
-                resultPanel.setImage(applyExclusions(viewModel.getDiffImage()));
+        addToolBarButton(toolBar, "|<", event -> {
+            if (viewModel.setPageToShow(0)) {
+                updatePage();
             }
         });
 
-        addToolBarButton(toolBar, "Page +", event -> {
+        addToolBarButton(toolBar, "<<", event -> {
+            if (viewModel.decreasePage()) {
+                updatePage();
+            }
+        });
+
+        addToolBarButton(toolBar, ">>", event -> {
             if (viewModel.increasePage()) {
-                pageIndexField.setText("" + (viewModel.getPageToShow() + 1));
-                leftPanel.setImage(applyExclusions(viewModel.getLeftImage()));
-                resultPanel.setImage(applyExclusions(viewModel.getDiffImage()));
+                updatePage();
+            }
+        });
+
+        addToolBarButton(toolBar, ">|", event -> {
+            if (viewModel.setPageToShow(viewModel.getMaxPages() - 1)) {
+                updatePage();
             }
         });
 
@@ -300,7 +290,28 @@ public class Display {
 
         frame.setVisible(true);
     }
-    
+
+    private void loadConfig() {
+        File file;
+        // look in working directory
+        file = new File("pdfcompare.conf");
+        if (! file.isFile()) {
+            // look for a default in user home directory
+            String currentUsersHomeDir = System.getProperty("user.home");
+            file = new File(currentUsersHomeDir, "pdfcompare.conf");
+        }
+        if (! file.isFile()) {
+            return;
+        }
+
+        LOG.info("Config: " + file.getAbsolutePath());
+        try {
+            this.config = PdfCompareStudioConfig.load(file);
+        } catch (IOException e) {
+            LOG.error("Error reading " + file, e);
+        }
+    }
+
     private void addMouseWheelZoomSupport(JScrollPane actualScrollPane) {
         // zoom using the mouse wheel
         MutableObject<Boolean> controlState = new MutableObject(Boolean.FALSE);
@@ -433,7 +444,7 @@ public class Display {
             leftPanel.setImage(applyExclusions(viewModel.getLeftImage()));
             resultPanel.setImage(applyExclusions(viewModel.getDiffImage()));
 
-            pageIndexField.setText("" + (viewModel.getPageToShow() + 1));
+            pageIndexField.setText("" + getPageNumber());
             pageCountField.setText("" + compareResult.getNumberOfPages());
 
             if (compareResult.isEqual()) {
@@ -455,7 +466,7 @@ public class Display {
             public void mouseClicked(MouseEvent e) {
                 // pick selected area by clicking on it
                 double zoom = leftPanel.getZoomFactor();
-                ExclusionItemPanel item = exclusionsPanel.getItemAt(viewModel.getPageToShow() + 1,
+                ExclusionItemPanel item = exclusionsPanel.getItemAt(getPageNumber(),
                         (int) (e.getX() / zoom),
                         (int) (e.getY() / zoom));
                 if (item != null) {
@@ -536,6 +547,23 @@ public class Display {
         redrawImages();
     }
 
+    private void onPageIndexAction() {
+        try {
+            String text = pageIndexField.getText();
+            int targetPage = Integer.valueOf(text).intValue() - 1;
+            if (targetPage < 0 || targetPage >= viewModel.getMaxPages()) {
+                // out of bounds
+                return;
+            }
+            
+            viewModel.setPageToShow(targetPage);
+            updatePage();
+            
+        } catch (NumberFormatException ex) {
+            //ignore invalid text
+        }
+    }
+    
     static void displayExceptionDialog(final JFrame frame, final IOException ex) {
         final StringWriter stringWriter = new StringWriter();
         ex.printStackTrace(new PrintWriter(stringWriter));
@@ -597,6 +625,11 @@ public class Display {
         return false;
     }
 
+    private void updatePage() {
+        pageIndexField.setText("" + getPageNumber());
+        redrawImages();
+    }
+
     public void redrawImages() {
         leftPanel.setImage(applyExclusions(viewModel.getLeftImage()));
         resultPanel.setImage(applyExclusions(viewModel.getDiffImage()));
@@ -608,7 +641,7 @@ public class Display {
     public void showPageArea(PageArea pageArea) {
         int pageNo = pageArea.getPage();
         viewModel.setPageToShow(pageNo - 1);
-        redrawImages();
+        updatePage();
 
         if (pageArea.getX1() != -1) {
             double zoom = leftPanel.getZoomFactor();
@@ -704,7 +737,8 @@ public class Display {
     public Exclusions getExclusions() {
         return exclusions;
     }
-    
+
+
     static public class MutableObject<T> {
         private T value;
         
@@ -724,7 +758,7 @@ public class Display {
             this.value = value;
         }
     }
-    
+
     /** this configuration is for personalized settings like default directories. */
     static public class PdfCompareStudioConfig {
         /** default directory for PDFs */
@@ -736,6 +770,27 @@ public class Display {
         private Pattern actualFilePattern;
         /** pattern for the sxclusions file. Matching groups (like $1) from the expectedFilePattern may be used. */
         private Pattern exclusionFilePattern;
+
+
+        static public PdfCompareStudioConfig load(File file) throws IOException {
+            PdfCompareStudioConfig config = new PdfCompareStudioConfig();
+
+            ConfigParseOptions configParseOptions = ConfigParseOptions.defaults().setSyntax(ConfigSyntax.CONF).setAllowMissing(true);
+            try (Reader reader = new FileReader(file)) {
+                Config exclusionConfig = ConfigFactory.parseReader(reader, configParseOptions);
+                config.directory = exclusionConfig.getString("directory");
+
+                ConfigObject groupObject = exclusionConfig.getObject("group");
+                if (groupObject != null) {
+                    config.expectedFilePattern = Pattern.compile(groupObject.toConfig().getString("expectedFilePattern"));
+                    config.actualFilePattern = Pattern.compile(groupObject.toConfig().getString("actualFilePattern"));
+                    config.exclusionFilePattern = Pattern.compile(groupObject.toConfig().getString("exclusionFilePattern"));
+                }
+                
+            }
+
+            return config;
+        }
     }
-    
+
 }

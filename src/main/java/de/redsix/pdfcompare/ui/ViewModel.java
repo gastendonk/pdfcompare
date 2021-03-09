@@ -20,6 +20,10 @@ public class ViewModel {
         return pageToShow;
     }
 
+    public int getMaxPages() {
+        return maxPages;
+    }
+
     public boolean isShowExpected() {
         return showExpected;
     }
