@@ -8,14 +8,15 @@ import org.slf4j.LoggerFactory;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.TreeMap;
 import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
+
 
 /**
  * Exclusions collect rectangular areas of the document, that shall be ignored during comparison.
@@ -53,7 +54,7 @@ public class Exclusions {
     private final float PT_TO_PIXEL;
     private static final Pattern NUMBER = Pattern.compile("([0-9.]+)(cm|mm|pt)");
     private static final ConfigParseOptions configParseOptions = ConfigParseOptions.defaults().setSyntax(ConfigSyntax.CONF).setAllowMissing(true);
-    private final Map<Integer, PageExclusions> exclusionsPerPage = new HashMap<>();
+    private final Map<Integer, PageExclusions> exclusionsPerPage = new TreeMap<>();
     private final PageExclusions exclusionsForAllPages = new PageExclusions();
 
     public Exclusions(Environment environment) {

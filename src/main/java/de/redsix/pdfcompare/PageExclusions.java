@@ -1,12 +1,23 @@
 package de.redsix.pdfcompare;
 
-import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
+import java.util.TreeSet;
+
 
 public class PageExclusions {
 
-    private final Collection<PageArea> exclusions = new ArrayList<>();
+    // order is first by y1, then x1, then y2, then x2
+    static private final Comparator<PageArea> COMPARATOR = Comparator
+            .comparingInt(PageArea::getY1)
+            .thenComparingInt(PageArea::getX1)
+            .thenComparingInt(PageArea::getY2)
+            .thenComparingInt(PageArea::getX2)
+            ;
+
+    private final Collection<PageArea> exclusions = new TreeSet<>(COMPARATOR);
     private final PageExclusions delegate;
+    
 
     public PageExclusions() {
         delegate = null;
