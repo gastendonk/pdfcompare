@@ -23,6 +23,7 @@ public class ExclusionItemPanel extends JPanel {
     static private final PositiveIntegerVerifier VERIFIER = new PositiveIntegerVerifier();
     static private final Font LABEL_FONT = Font.decode("SansSerif-plain-10");
     static private final Color INVALID_COLOR = new Color(0xd08080);
+    static private final Color OVERLAP_COLOR = new Color(0xd0d080);
 
     private JTextField page;
     private JTextField x1;
@@ -31,6 +32,7 @@ public class ExclusionItemPanel extends JPanel {
     private JTextField y2;
     private final List<ActionListener> listeners = new ArrayList<>();
     private boolean invalid = false;
+    private boolean overlaps = false;
     private final Color defaultBackground;
 
 
@@ -108,6 +110,7 @@ public class ExclusionItemPanel extends JPanel {
         } catch (IllegalArgumentException exception) {
             setInvalid(true);
         }
+        
         return null;
     }
 
@@ -173,8 +176,22 @@ public class ExclusionItemPanel extends JPanel {
     public void setInvalid(boolean invalid) {
         this.invalid = invalid;
 
+        paintBackground();
+    }
+
+    public void setOverlaps(boolean overlaps) {
+        this.overlaps = overlaps;
+
+        paintBackground();
+    }
+    
+    public void paintBackground() {
         if (invalid) {
             this.setBackground(INVALID_COLOR);
+            this.setOpaque(true);
+        } else
+        if (overlaps) {
+            this.setBackground(OVERLAP_COLOR);
             this.setOpaque(true);
         } else {
             // NOTE: the see through background can be visible in borders

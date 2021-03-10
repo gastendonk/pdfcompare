@@ -52,6 +52,7 @@ import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.JToggleButton;
 import javax.swing.JToolBar;
+import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
 import javax.swing.WindowConstants;
 
@@ -178,7 +179,7 @@ public class Display {
 
         pageIndexField.setEditable(true);
         pageIndexField.setFocusable(true);
-        pageIndexField.setHorizontalAlignment(JTextField.RIGHT);
+        pageIndexField.setHorizontalAlignment(SwingConstants.RIGHT);
         pageIndexField.setMaximumSize(new Dimension(40, pageIndexField.getPreferredSize().height));
         toolBar.add(pageIndexField);
         pageIndexField.addActionListener(event -> onPageIndexAction());
@@ -194,7 +195,7 @@ public class Display {
         pageCountField.setEditable(false);
         pageCountField.setFocusable(false);
         pageCountField.setMaximumSize(new Dimension(40, pageCountField.getPreferredSize().height));
-        pageCountField.setHorizontalAlignment(JTextField.LEFT);
+        pageCountField.setHorizontalAlignment(SwingConstants.LEFT);
         toolBar.add(pageCountField);
 
         addToolBarButton(toolBar, "|<", event -> {
@@ -443,9 +444,11 @@ public class Display {
             viewModel = new ViewModel(compareResult);
             leftPanel.setImage(applyExclusions(viewModel.getLeftImage()));
             resultPanel.setImage(applyExclusions(viewModel.getDiffImage()));
-
+            
             pageIndexField.setText("" + getPageNumber());
             pageCountField.setText("" + compareResult.getNumberOfPages());
+            
+            exclusionsPanel.setCompareResult(compareResult);
 
             if (compareResult.isEqual()) {
                 JOptionPane.showMessageDialog(frame, "The compared documents are identical.");

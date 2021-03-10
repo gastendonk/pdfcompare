@@ -37,6 +37,7 @@ import javax.swing.border.BevelBorder;
 import javax.swing.filechooser.FileFilter;
 import javax.swing.filechooser.FileNameExtensionFilter;
 
+import de.redsix.pdfcompare.CompareResult;
 import de.redsix.pdfcompare.Exclusions;
 import de.redsix.pdfcompare.PageArea;
 import de.redsix.pdfcompare.env.Environment;
@@ -96,10 +97,10 @@ public class ExclusionsPanel extends JPanel {
         toolBar.setFloatable(false);
         this.add(toolBar, BorderLayout.SOUTH);
 
-        addToolBarButton(toolBar, "New", "Add new exclusion block", event -> addItemAction());
-        addToolBarButton(toolBar, "Diffs", "Show computed differences", event -> showComputedDifferencesAction());
-        addToolBarButton(toolBar, "Load", "Load exclusions file", event -> loadAction());
-        addToolBarButton(toolBar, "Save", "Save exclusions file", event -> saveAction());
+        addToolBarButton(toolBar, "New", "Add new exclusion block", event -> onAddItemAction());
+        addToolBarButton(toolBar, "Diffs", "Show computed differences", event -> onShowComputedDifferencesAction());
+        addToolBarButton(toolBar, "Load", "Load exclusions file", event -> onLoadAction());
+        addToolBarButton(toolBar, "Save", "Save exclusions file", event -> onSaveAction());
 
         // support to drag config files into the panel
         new DropTarget(this, DnDConstants.ACTION_COPY, new DropTargetAdapter() {
@@ -163,11 +164,11 @@ public class ExclusionsPanel extends JPanel {
         });
     }
 
-    private void addItemAction() {
+    private void onAddItemAction() {
         addExclusion(new PageArea(display.getPageNumber()));
     }
 
-    private void showComputedDifferencesAction() {
+    private void onShowComputedDifferencesAction() {
         if (exclusionsList.getComponents().length == 0 || askForReplacement()) {
             useDifferencesFromCompare();
             display.redrawImages();
@@ -179,7 +180,7 @@ public class ExclusionsPanel extends JPanel {
                 JOptionPane.OK_CANCEL_OPTION, JOptionPane.INFORMATION_MESSAGE) == JOptionPane.OK_OPTION;
     }
 
-    private void loadAction() {
+    private void onLoadAction() {
         JFileChooser fileChooser = new JFileChooser();
         fileChooser.setSelectedFile(selectedFile);
         fileChooser.setFileFilter(CONFIG_FILTER);
@@ -189,7 +190,7 @@ public class ExclusionsPanel extends JPanel {
         }
     }
 
-    private void saveAction() {
+    private void onSaveAction() {
         JFileChooser fileChooser = new JFileChooser();
         fileChooser.setSelectedFile(selectedFile);
         fileChooser.setFileFilter(CONFIG_FILTER);
@@ -205,9 +206,8 @@ public class ExclusionsPanel extends JPanel {
         }
     }
 
-    public void useDifferencesFromCompare(Collection<PageArea> differences) {
-        differencesFromCompare = differences;
-        useDifferencesFromCompare();
+    public void setCompareResult(CompareResult compareResult) {
+        differencesFromCompare = compareResult.getDifferences();
     }
 
     private void useDifferencesFromCompare() {
@@ -226,6 +226,7 @@ public class ExclusionsPanel extends JPanel {
 
     private void removeItem(ExclusionItemPanel item) {
         exclusionsList.remove(item);
+        checkOverlaps();
         exclusionsList.repaint();
         display.redrawImages();
     }
@@ -290,15 +291,39 @@ public class ExclusionsPanel extends JPanel {
         return selectedArea.equals(pageArea);
     }
 
+    /** find overlapping items */
+    private void checkOverlaps() {
+        List<ExclusionItemPanel> itemPanels = getExclusionItemPanels();
+        for (ExclusionItemPanel item : itemPanels) {
+            boolean overlaps = false;
+            
+            for (ExclusionItemPanel item2 : itemPanels) {
+                if (item == item2) {
+                    continue;
+                }
+                
+                PageArea e = item.getData();
+                PageArea e2 = item2.getData();
+                if (e.getPage() == e2.getPage()
+                        && e.getX1() < e2.getX2() && e.getX2() > e2.getX1()
+                        && e.getY1() < e2.getY2() && e.getY2() > e2.getY1()) {
+                    overlaps = true;
+                }
+            }
+            
+            item.setOverlaps(overlaps);
+        }
+    }
+    
     /**
      * set data to UI
      */
     private void createExclusionItems(Exclusions exclusions) {
         exclusionsList.removeAll();
-
+        
         exclusions.forEach(e -> {
             ExclusionItemPanel item = new ExclusionItemPanel(e);
-
+            
             item.addActionListener(event -> {
                 if (ExclusionItemPanel.INPUT_CHANGED.equals(event.getActionCommand())) {
                     display.redrawImages();
@@ -336,6 +361,8 @@ public class ExclusionsPanel extends JPanel {
             });
             exclusionsList.add(item);
         });
+        
+        checkOverlaps();
         
         exclusionsList.revalidate();
     }
