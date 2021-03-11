@@ -59,6 +59,7 @@ public class ExclusionsPanel extends JPanel {
     private final Display display;
     private Collection<PageArea> differencesFromCompare = new ArrayList<>();
 
+
     public ExclusionsPanel(Display display, Environment environment) {
         this.environment = environment;
         this.display = display;
@@ -193,6 +194,9 @@ public class ExclusionsPanel extends JPanel {
     private void onSaveAction() {
         JFileChooser fileChooser = new JFileChooser();
         fileChooser.setSelectedFile(selectedFile);
+        if (selectedFile == null) {
+            fileChooser.setCurrentDirectory(new File("."));
+        }
         fileChooser.setFileFilter(CONFIG_FILTER);
 
         if (fileChooser.showDialog(this, "Save exclusions as") == JFileChooser.APPROVE_OPTION) {
