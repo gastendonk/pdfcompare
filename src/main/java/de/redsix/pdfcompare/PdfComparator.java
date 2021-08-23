@@ -55,16 +55,16 @@ public class PdfComparator<T extends CompareResultImpl> {
     private static final TimeUnit unit = TimeUnit.MINUTES;
     public static final int MARKER_WIDTH = 20;
 
-    private Environment environment;
+    protected Environment environment;
     private Exclusions exclusions;
-    private InputStreamSupplier expectedStreamSupplier;
-    private InputStreamSupplier actualStreamSupplier;
+    protected InputStreamSupplier expectedStreamSupplier;
+    protected InputStreamSupplier actualStreamSupplier;
     private ExecutorService drawExecutor;
     private ExecutorService parrallelDrawExecutor;
     private ExecutorService diffExecutor;
     private final T compareResult;
-    private String expectedPassword = "";
-    private String actualPassword = "";
+    protected String expectedPassword = "";
+    protected String actualPassword = "";
     private boolean withIgnoreCalled = false;
     private final ConcurrentLinkedQueue<Throwable> exceptionFromOtherThread = new ConcurrentLinkedQueue<>();
 
@@ -94,7 +94,7 @@ public class PdfComparator<T extends CompareResultImpl> {
         return pdfComparator;
     }
 
-    private PdfComparator(T compareResult) {
+    protected PdfComparator(T compareResult) {
         Objects.requireNonNull(compareResult, "compareResult is null");
         this.compareResult = compareResult;
     }
@@ -174,7 +174,7 @@ public class PdfComparator<T extends CompareResultImpl> {
         this(compareResult);
         Objects.requireNonNull(expectedFile, "expectedFile is null");
         Objects.requireNonNull(actualFile, "actualFile is null");
-        if (!expectedFile.equals(actualFile)) {
+        if (! expectedFile.equals(actualFile)) {
             this.expectedStreamSupplier = () -> new FileInputStream(expectedFile);
             this.actualStreamSupplier = () -> new FileInputStream(actualFile);
         }
@@ -349,21 +349,21 @@ public class PdfComparator<T extends CompareResultImpl> {
         return this;
     }
 
-    private Exclusions getExclusions() {
+    protected Exclusions getExclusions() {
         if (exclusions == null) {
             exclusions = new Exclusions(getEnvironment());
         }
         return exclusions;
     }
 
-    private Environment getEnvironment() {
+    protected Environment getEnvironment() {
         if (environment == null) {
             environment = DefaultEnvironment.create();
         }
         return environment;
     }
 
-    private void buildEnvironment() {
+    protected void buildEnvironment() {
         compareResult.setEnvironment(getEnvironment());
 
         drawExecutor = blockingExecutor("Draw", 1, 50, environment);
@@ -414,7 +414,7 @@ public class PdfComparator<T extends CompareResultImpl> {
         return compareResult;
     }
 
-    private void compare(final PDDocument expectedDocument, final PDDocument actualDocument) throws IOException {
+    protected void compare(final PDDocument expectedDocument, final PDDocument actualDocument) throws IOException {
         expectedDocument.setResourceCache(new ResourceCacheWithLimitedImages(environment));
         PDFRenderer expectedPdfRenderer = new PDFRenderer(expectedDocument);
 
@@ -547,7 +547,7 @@ public class PdfComparator<T extends CompareResultImpl> {
     }
 
     @FunctionalInterface
-    private interface InputStreamSupplier {
+    public interface InputStreamSupplier {
 
         InputStream get() throws IOException;
     }

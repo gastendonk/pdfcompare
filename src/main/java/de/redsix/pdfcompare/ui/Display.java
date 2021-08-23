@@ -434,8 +434,10 @@ public class Display {
             throws IOException {
         frame.setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
         try {
-            PdfComparator<CompareResultWithExpectedAndActual> pdfComparator
-                    = new PdfComparator<>(expectedFile, actualFile, new CompareResultWithExpectedAndActual());
+            // this is the default loader that loads all pages at the start
+//            PdfComparator<CompareResultWithExpectedAndActual> pdfComparator = new PdfComparator<>(expectedFile, actualFile, new CompareResultWithExpectedAndActual());
+            // this solves problems with large files by loading pages on access
+            PdfComparator<? extends CompareResultWithExpectedAndActual> pdfComparator = new OnDemandPdfComparator<>(expectedFile, actualFile, new OnDemandCompareResult());
             passwordForExpectedFile.ifPresent(pdfComparator::withExpectedPassword);
             passwordForActualFile.ifPresent(pdfComparator::withActualPassword);
             exclusions.ifPresent(pdfComparator::withIgnore);
