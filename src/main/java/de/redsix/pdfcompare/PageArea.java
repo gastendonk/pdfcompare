@@ -154,9 +154,10 @@ public class PageArea {
 
     public static String asJsonWithExclusion(Stream<PageArea> pageAreaStream) {
         String json = asJson(pageAreaStream);
-        return json.isEmpty()
-                ? "exclusions: [\n]"
-                : "exclusions: [\n" + json + "\n]";
+        return "{" + (json.isEmpty()
+                ? "\"exclusions\": [\n]"
+                : "\"exclusions\": [\n" + json + "\n]")
+                + "}";
     }
 
     public static String asJson(Collection<PageArea> pageAreas) {
