@@ -13,10 +13,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.api.extension.ExtendWith;
 
+import java.awt.*;
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.Base64;
 import java.util.Collection;
 import java.util.Iterator;
@@ -41,7 +43,9 @@ public class IntegrationTest extends FileReading {
 
     @Test
     public void differingDocumentsAreNotEqual() throws IOException {
-        final CompareResult result = new PdfComparator<>(r("expected.pdf"), r("actual.pdf")).compare();
+        final CompareResult result = new PdfComparator<>(r("expected.pdf"), r("actual.pdf"))
+                .withEnvironment(new SimpleEnvironment().setExpectedColor(Color.BLACK))
+                .compare();
         assertThat(result.isNotEqual(), is(true));
         assertThat(result.isEqual(), is(false));
         assertThat(result.hasOnlyExpected(), is(false));
@@ -155,6 +159,8 @@ public class IntegrationTest extends FileReading {
         assertThat(result.isEqual(), is(false));
         assertThat(result.getNumberOfPages(), is(2));
         assertThat(result.getDifferences(), hasSize(1));
+        assertThat(result.getPagesWithDifferences(), hasSize(1));
+        assertThat(result.getPagesWithDifferences().iterator().next(), is(2));
         assertThat(result.getDifferences().iterator().next().page, is(2));
         writeAndCompare(result);
     }
@@ -263,7 +269,7 @@ public class IntegrationTest extends FileReading {
             result.writeTo(filename);
             try (final InputStream expectedPdf = getClass().getResourceAsStream(testName + ".pdf")) {
                 if (expectedPdf != null) {
-                    assertTrue(new PdfComparator<>(expectedPdf, new FileInputStream(filename + ".pdf")).compare().isEqual());
+                    compareAndCheck(expectedPdf, filename, testName);
                 } else {
                     assertFalse(Files.exists(Paths.get(filename + ".pdf")));
                 }
@@ -277,11 +283,20 @@ public class IntegrationTest extends FileReading {
             result.writeTo(new FileOutputStream(filename + ".pdf"));
             try (final InputStream expectedPdf = getClass().getResourceAsStream(testName + ".pdf")) {
                 if (expectedPdf != null) {
-                    assertTrue(new PdfComparator<>(expectedPdf, new FileInputStream(filename + ".pdf")).compare().isEqual());
+                    compareAndCheck(expectedPdf, filename, testName);
                 } else {
                     assertThat(Files.size(Paths.get(filename + ".pdf")), is(0));
                 }
             }
         }
+    }
+
+    private void compareAndCheck(InputStream expectedPdf, String filename, String testName) throws IOException {
+        CompareResultImpl compare = new PdfComparator<>(expectedPdf, new FileInputStream(filename + ".pdf")).compare();
+        if (!compare.isEqual()) {
+            Files.move(Paths.get(filename + ".pdf"), Paths.get("actual_" + testName + ".pdf"), StandardCopyOption.REPLACE_EXISTING);
+            compare.writeTo("diff_" + testName);
+        }
+        assertTrue(compare.isEqual());
     }
 }

@@ -2,6 +2,7 @@ package de.redsix.pdfcompare;
 
 import java.io.OutputStream;
 import java.util.Collection;
+import java.util.Map;
 
 public interface CompareResult {
 
@@ -69,6 +70,12 @@ public interface CompareResult {
      */
     boolean hasOnlyOneDoc();
 
+    /**
+     * Gives that total number of pages in the result. This includes pages with differences.
+     * When the setting addEqualPagesToResult is set to true, the pages without differences are also counted.
+     *
+     * @return total number of pages in the result
+     */
     int getNumberOfPages();
 
     /**
@@ -85,4 +92,19 @@ public interface CompareResult {
      * @return a JSON string with exclusion areas.
      */
     String getDifferencesJson();
+
+    /**
+     * Gives a collection of all the pages, that have a difference.
+     * The first page of a document is page 1.
+     *
+     * @return collection of page numbers, that have a difference
+     */
+    Collection<Integer> getPagesWithDifferences();
+
+    /**
+     * Gives a map of the difference percentages per page.
+     * 
+     * @return difference percentages mapped to the page index.
+     */
+    Map<Integer, Double> getPageDiffsInPercent();
 }

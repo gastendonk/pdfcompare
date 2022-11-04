@@ -29,6 +29,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.util.*;
 import java.util.Map.Entry;
+import java.util.stream.Collectors;
 
 /**
  * A CompareResult tracks the differences, that result from a comparison.
@@ -46,6 +47,7 @@ public class CompareResultImpl implements ResultCollector, CompareResult {
     private boolean expectedOnly;
     private boolean actualOnly;
     private final Collection<PageArea> diffAreas = new ArrayList<>();
+    private final Map<Integer, Double> diffPercentages = new TreeMap<>();
     private int pages = 0;
 
     @Override
@@ -126,6 +128,7 @@ public class CompareResultImpl implements ResultCollector, CompareResult {
         Objects.requireNonNull(actualImage, "actualImage is null");
         Objects.requireNonNull(diffImage, "diffImage is null");
         this.hasDifferenceInExclusion |= diffCalculator.differencesFoundInExclusion();
+        diffPercentages.put(pageIndex, diffCalculator.getDifferenceInPercent());
         if (diffCalculator.differencesFound()) {
             isEqual = false;
             diffAreas.add(diffCalculator.getDiffArea());
@@ -185,6 +188,16 @@ public class CompareResultImpl implements ResultCollector, CompareResult {
     @Override
     public String getDifferencesJson() {
         return PageArea.asJsonWithExclusion(getDifferences());
+    }
+
+    @Override
+    public Collection<Integer> getPagesWithDifferences() {
+        return diffAreas.stream().map(a -> a.page).collect(Collectors.toList());
+    }
+
+    @Override
+    public Map<Integer, Double> getPageDiffsInPercent() {
+        return diffPercentages;
     }
 
     public void expectedOnly() {

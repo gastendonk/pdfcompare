@@ -12,3 +12,32 @@
 - The New button adds a new exclusions block for the current page.
 - The rectangles in the PDF display can be clicked. A double click in the right area jumps to the rectangle in the PDF display. Dashed guidelines appear around the rectangles.
 - You can now zoom using the mouse wheel, while CTRL is pressed.
+
+## 1.1.56
+
+#### Added
+- Show return codes in CLI help text
+
+## 1.1.57
+
+#### Fixed
+- Integrations Tests - expected documents addapted to new PdfBox version.
+
+#### Security
+- Upgrade PdfBox to version 2.0.22, which fixes a vulnerability
+
+## 1.1.58
+
+#### Added
+- Add getPagesWithDifferences to CompareResult
+
+## 1.1.59
+
+#### Fixed
+- Upgrade dependencies
+
+## 1.1.60
+
+#### Added
+- Add getPageDiffsInPercent to CompareResult to hand out how different pages are
+
