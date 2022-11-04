@@ -404,6 +404,7 @@ public class Display {
                         if (config.exclusionFilePattern != null) {
                             String exclusionFilename = expectedFile.getName().replaceFirst(config.expectedFilePattern.pattern(), config.exclusionFilePattern.pattern());
                             exclusionFile = new File(expectedFile.getParentFile(), exclusionFilename);
+                            exclusionsPanel.setSelectedFile(exclusionFile);
                             if (! exclusionFile.isFile()) {
                                 exclusionFile = null;
                             }
