@@ -56,7 +56,7 @@ import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
 import javax.swing.WindowConstants;
 
-import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.pdmodel.encryption.InvalidPasswordException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -624,7 +624,7 @@ public class Display {
 
     private static boolean isInvalidPassword(final File file, final String password) throws IOException {
         try {
-            PDDocument.load(file, password).close();
+            Loader.loadPDF(file, password).close();
         } catch (InvalidPasswordException e) {
             return true;
         }
