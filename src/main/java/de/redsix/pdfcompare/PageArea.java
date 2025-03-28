@@ -85,10 +85,14 @@ public class PageArea {
     }
 
     public boolean contains(int x, int y) {
-        if (x1 == -1 && y1 == -1 && x2 == -1 && y2 == -1) {
+        if (isPageExclusion()) {
             return true;
         }
         return x >= x1 && x <= x2 && y >= y1 && y <= y2;
+    }
+
+    public boolean isPageExclusion() {
+        return (x1 == -1 && y1 == -1 && x2 == -1 && y2 == -1);
     }
 
     public int getPage() {
