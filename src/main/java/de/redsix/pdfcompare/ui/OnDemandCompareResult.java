@@ -7,7 +7,7 @@ import java.util.HashSet;
 import java.util.Set;
 
 import org.apache.pdfbox.cos.COSDictionary;
-import org.apache.pdfbox.multipdf.PDFCloneUtility;
+import org.apache.pdfbox.multipdf.XmapPDFCloneUtility;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.rendering.PDFRenderer;
@@ -41,7 +41,7 @@ public class OnDemandCompareResult extends CompareResultWithExpectedAndActual {
         
         PDDocument target= new PDDocument();
         
-        PDFCloneUtility util = new PDFCloneUtility(target);
+        XmapPDFCloneUtility util = new XmapPDFCloneUtility(target);
 //        util.cloneMerge(util.cloneForNewDocument(doc.getDocument()), target.getDocument());
         util.cloneMerge(doc.getDocumentCatalog(), target.getDocumentCatalog());
 
